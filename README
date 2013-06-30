@@ -1,0 +1,2 @@
+sqlite> SELECT * FROM users;
+misodengaku|104|2013/06/21 17:23:26 +0900
