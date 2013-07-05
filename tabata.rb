@@ -8,9 +8,6 @@ require 'sqlite3'
 require 'yaml'
 include SQLite3
 
-#Process.daemon
-
-
 class TabataDaemon < DaemonSpawn::Base
 	db = nil
 	def start(args)
@@ -36,7 +33,6 @@ class TabataDaemon < DaemonSpawn::Base
 		client = TweetStream::Client.new
 
 		puts "Tabata_bot is ready!"
-
 		client.track("田端でバタバタ") do |status|
 			Twitter.favorite(status.id)
 			puts("faved.")
@@ -62,15 +58,14 @@ class TabataDaemon < DaemonSpawn::Base
 			#p result
 			puts "#{status.user.screen_name}: update complete"
 		end
-		
-		#client.userstream do |status|
-		#	if status.user.screen_name == "misodengaku" then
-		#		Twitter.favorite(status.id)
-		#		if status.text == "生存確認" then
-		#			Twitter.update("@misodengaku 田端botは正常に稼働しています。")
-		#		end
-		#	end
-		#end
+		client.userstream do |status|
+			if status.user.screen_name == "misodengaku" then
+				Twitter.favorite(status.id)
+				if status.text == "生存確認" then
+					Twitter.update("@misodengaku 田端botは正常に稼働しています。")
+				end
+			end
+		end
 	end
 	
 	def stop
