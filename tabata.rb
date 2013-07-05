@@ -33,39 +33,48 @@ class TabataDaemon < DaemonSpawn::Base
 		client = TweetStream::Client.new
 
 		puts "Tabata_bot is ready!"
-		client.track("田端でバタバタ") do |status|
-			Twitter.favorite(status.id)
-			puts("faved.")
-			#puts("SELECT count,recent FROM users WHERE screen_name='#{status.user.screen_name}'")
-			i = db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name='#{status.user.screen_name}'")
-			if i != 0 then
-			count =	db.get_first_value("SELECT count FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
-			p count
-				recent =	db.get_first_value("SELECT recent FROM users WHERE screen_name = \"#{status.user.screen_name}\"")
-				p recent
-			#p (status.created_at-recent).to_i
-				count = count + 1
-			puts("UPDATE users SET count=#{count} WHERE screen_name='#{status.user.screen_name}'")
-				db.execute("UPDATE users SET count=#{count} WHERE screen_name='#{status.user.screen_name}'")
-				Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に田端でバタバタしました。通算#{count}回目です。")
-			else
-			puts("new user")
-			Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に初めて田端でバタバタしました。")
-			puts("INSERT INTO users VALUES('#{status.user.screen_name}', 1, '#{status.created_at}')")
-			db.execute("INSERT INTO users VALUES('#{status.user.screen_name}', 1, '#{status.created_at}')")
-			end
-			puts("posted.")
-			#p result
-			puts "#{status.user.screen_name}: update complete"
-		end
-		client.userstream do |status|
-			if status.user.screen_name == "misodengaku" then
+		filter = Thread.new{
+			client.track("田端でバタバタ") do |status|
 				Twitter.favorite(status.id)
-				if status.text == "生存確認" then
-					Twitter.update("@misodengaku 田端botは正常に稼働しています。")
+				puts("faved.")
+				#puts("SELECT count,recent FROM users WHERE screen_name='#{status.user.screen_name}'")
+				i = db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name='#{status.user.screen_name}'")
+				if i != 0 then
+				count =	db.get_first_value("SELECT count FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
+				p count
+					recent =	db.get_first_value("SELECT recent FROM users WHERE screen_name = \"#{status.user.screen_name}\"")
+					p recent
+				#p (status.created_at-recent).to_i
+					count = count + 1
+				puts("UPDATE users SET count=#{count} WHERE screen_name='#{status.user.screen_name}'")
+					db.execute("UPDATE users SET count=#{count} WHERE screen_name='#{status.user.screen_name}'")
+					Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に田端でバタバタしました。通算#{count}回目です。")
+				else
+				puts("new user")
+				Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に初めて田端でバタバタしました。")
+				puts("INSERT INTO users VALUES('#{status.user.screen_name}', 1, '#{status.created_at}')")
+				db.execute("INSERT INTO users VALUES('#{status.user.screen_name}', 1, '#{status.created_at}')")
 				end
+				puts("posted.")
+				#p result
+				puts "#{status.user.screen_name}: update complete"
+				sleep 1
 			end
-		end
+		}
+		stream = Thread.new{
+			client.userstream do |status|
+				if status.user.screen_name == "misodengaku" then
+					Twitter.favorite(status.id)
+					if status.text == "生存確認" then
+						Twitter.update("@misodengaku 田端botは正常に稼働しています。")
+					end
+				end
+				sleep 1
+			end
+		}
+		
+		puts "thread start"
+		filter.join
 	end
 	
 	def stop
