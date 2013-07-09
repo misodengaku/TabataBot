@@ -65,9 +65,9 @@ class TabataDaemon < DaemonSpawn::Base
 			client.userstream do |status|
 				if status.user.screen_name == "misodengaku" then
 					Twitter.favorite(status.id)
-					if status.text == "生存確認" then
+					#if status.text.include?("生存確認") then
 						Twitter.update("@misodengaku 田端botは正常に稼働しています。")
-					end
+					#end
 				end
 				sleep 1
 			end
