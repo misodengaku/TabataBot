@@ -9,11 +9,18 @@ require 'yaml'
 include SQLite3
 
 class TabataDaemon < DaemonSpawn::Base
-	db = nil
+	@filter = nil
+	@stream = nil
+	
 	def start(args)
 		puts("\n\n")
 		settings = YAML::load(open("./tabata.conf"))
 		db = Database.new("./tabata.db")
+		#update.execute(count, screen_name)
+		update = db.prepare('UPDATE users SET count=?,recent=? WHERE screen_name=?')
+		# insert.execute(screen_name, created_at)
+		insert = db.prepare('INSERT INTO users VALUES(?, 1, ?)')
+
 
 		TweetStream.configure do |config|
 			config.consumer_key			= settings["consumer_key"]
@@ -33,52 +40,82 @@ class TabataDaemon < DaemonSpawn::Base
 		client = TweetStream::Client.new
 
 		puts "Tabata_bot is ready!"
-		filter = Thread.new{
+		@filter = Thread.new{
+			
 			client.track("田端でバタバタ") do |status|
-				Twitter.favorite(status.id)
-				puts("faved.")
-				#puts("SELECT count,recent FROM users WHERE screen_name='#{status.user.screen_name}'")
-				i = db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name='#{status.user.screen_name}'")
-				if i != 0 then
-					count =	db.get_first_value("SELECT count FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
-					p count
-					recent = db.get_first_value("SELECT recent FROM users WHERE screen_name = \"#{status.user.screen_name}\"")
-					p recent
-					#p (status.created_at-recent).to_i
-					count = count + 1
-					puts("UPDATE users SET count=#{count} WHERE screen_name='#{status.user.screen_name}'")
-					db.execute("UPDATE users SET count=#{count} WHERE screen_name='#{status.user.screen_name}'")
-					Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に田端でバタバタしました。通算#{count}回目です。")
-				else
-					puts("new user")
-					Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に初めて田端でバタバタしました。")
-					puts("INSERT INTO users VALUES('#{status.user.screen_name}', 1, '#{status.created_at}')")
-					db.execute("INSERT INTO users VALUES('#{status.user.screen_name}', 1, '#{status.created_at}')")
+				if status.retweeted_status.nil? then #RT弾き
+					puts "new tweet catched"
+					Twitter.favorite(status.id)
+					
+					i = db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name='#{status.user.screen_name}'")
+					if i != 0 then
+						puts "update"
+					
+						count =	db.get_first_value("SELECT count FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
+						recent = db.get_first_value("SELECT recent FROM users WHERE screen_name = \"#{status.user.screen_name}\"")
+						#p (status.created_at-recent).to_time.to_i
+						count = count + 1
+						
+						begin
+							Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に田端でバタバタしました。通算#{count}回目です。")
+						rescue => exc
+							puts "[!] Twitter Error"
+							p exc
+						end
+						
+						begin
+							update.execute(count, status.created_at.to_s, status.user.screen_name)
+						rescue => exc
+							puts "[!] SQL Error"
+							p exc
+						end
+						puts("updated: #{status.user.screen_name}")
+						
+					else
+						puts "insert"
+						
+						begin
+							Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に初めて田端でバタバタしました。")
+						rescue => exc
+							puts "[!] Twitter Error"
+							p exc
+						end
+						
+						begin
+							insert.execute(status.user.screen_name, status.created_at.to_s)
+						rescue => exc
+							puts "[!] SQL Error"
+							p exc
+						end
+						
+						puts "new user: #{status.user.screen_name}"
+					end
 				end
 
-				#p result
-				puts "#{status.user.screen_name}: update complete"
-				sleep 1
+				sleep 0.01
 			end
 		}
-		stream = Thread.new{
+		
+		@stream = Thread.new{
 			client.userstream do |status|
-				if status.user.screen_name == "misodengaku" then
+				if status.user.screen_name == "misodengaku" and status.text.include?("生存確認") then
 					Twitter.favorite(status.id)
-					#if status.text.include?("生存確認") then
-						Twitter.update("@misodengaku 田端botは正常に稼働しています。")
-					#end
+					Twitter.update("@misodengaku 田端botは正常に稼働しています。")
 				end
-				sleep 1
+				sleep 0.01
 			end
 		}
 		
 		puts "thread start"
-		filter.join
+		@stream.run
+		@filter.join
 	end
 	
 	def stop
-		db.close()
+		Thread::kill(@filter)
+		Thread::kill(@stream)
+		
+		puts "Tabata_bot is stoped."
 	end
 end
 
