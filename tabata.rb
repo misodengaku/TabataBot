@@ -40,22 +40,22 @@ class TabataDaemon < DaemonSpawn::Base
 				#puts("SELECT count,recent FROM users WHERE screen_name='#{status.user.screen_name}'")
 				i = db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name='#{status.user.screen_name}'")
 				if i != 0 then
-				count =	db.get_first_value("SELECT count FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
-				p count
-					recent =	db.get_first_value("SELECT recent FROM users WHERE screen_name = \"#{status.user.screen_name}\"")
+					count =	db.get_first_value("SELECT count FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
+					p count
+					recent = db.get_first_value("SELECT recent FROM users WHERE screen_name = \"#{status.user.screen_name}\"")
 					p recent
-				#p (status.created_at-recent).to_i
+					#p (status.created_at-recent).to_i
 					count = count + 1
-				puts("UPDATE users SET count=#{count} WHERE screen_name='#{status.user.screen_name}'")
+					puts("UPDATE users SET count=#{count} WHERE screen_name='#{status.user.screen_name}'")
 					db.execute("UPDATE users SET count=#{count} WHERE screen_name='#{status.user.screen_name}'")
 					Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に田端でバタバタしました。通算#{count}回目です。")
 				else
-				puts("new user")
-				Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に初めて田端でバタバタしました。")
-				puts("INSERT INTO users VALUES('#{status.user.screen_name}', 1, '#{status.created_at}')")
-				db.execute("INSERT INTO users VALUES('#{status.user.screen_name}', 1, '#{status.created_at}')")
+					puts("new user")
+					Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に初めて田端でバタバタしました。")
+					puts("INSERT INTO users VALUES('#{status.user.screen_name}', 1, '#{status.created_at}')")
+					db.execute("INSERT INTO users VALUES('#{status.user.screen_name}', 1, '#{status.created_at}')")
 				end
-				puts("posted.")
+
 				#p result
 				puts "#{status.user.screen_name}: update complete"
 				sleep 1
@@ -84,7 +84,7 @@ end
 
 TabataDaemon.spawn!({
 	:working_dir => Dir::getwd, # これだけ必須オプション
-	:pid_file => './hoge.pid',
+	:pid_file => './tabata.pid',
 	:log_file => './tabata.log',
 	:sync_log => true,
 	:singleton => true # これを指定すると多重起動しない
