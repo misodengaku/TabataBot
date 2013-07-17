@@ -14,6 +14,11 @@ class TabataDaemon < DaemonSpawn::Base
 	
 	def start(args)
 		puts("\n\n")
+		nglists = open("nglist.txt").split("\n")
+		p nglists
+		return
+		
+		
 		settings = YAML::load(open("./tabata.conf"))
 		db = Database.new("./tabata.db")
 		#update.execute(count, screen_name)
