@@ -64,7 +64,7 @@ class TabataDaemon < DaemonSpawn::Base
 				puts "[#{Time.now}]: filter thread started."
 				client.track("田端でバタバタ") do |status|
 					interval = (status.created_at - beforeTabaTime).to_i
-					
+					puts "interval #{interval}"
 					if status.retweeted_status.nil? && nglists.index(status.user.screen_name).nil? then #フィルタ
 						
 						Twitter.favorite(status.id)
@@ -100,12 +100,17 @@ class TabataDaemon < DaemonSpawn::Base
 						
 						else
 							puts "[#{Time.now}]: insert"
-						
-							begin
-								Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に初めて田端でバタバタしました。")
-							rescue => exc
-								puts "[#{Time.now}]: [ERROR] Twitter Error"
-								p exc
+							
+							if interval >= 85 then
+								beforeTabaTime = status.created_at
+								begin
+									Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に初めて田端でバタバタしました。")
+								rescue => exc
+									puts "[#{Time.now}]: [ERROR] Twitter Error"
+									p exc
+								end
+							else
+								puts "[#{Time.now}]: postlimit evasion."
 							end
 						
 							begin
