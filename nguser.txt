@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 7Apy
 saolw
 92353
@@ -26,4 +27,34 @@ nr4i
 riosu_another
 7ptb
 uu_s6
+=======
+7Apy
+saolw
+92353
+5oi_
+S5oi
+50i5
+50i2
+50i4
+50i7
+5oi9
+5oi7
+50i9
+5i06
+6apy
+4apy
+5oi1
+4hlS
+4yOs
+_4hl
+r_gq
+4yGq
+4hl_
+nr4i
+4y_7
+59n_
+riosu_another
+7ptb
+uu_s6
+>>>>>>> origin/master
 riosukun
