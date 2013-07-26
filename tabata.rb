@@ -8,8 +8,8 @@ require 'sqlite3'
 require 'yaml'
 include SQLite3
 
-#検索するワード
-TRACKWORD = "田端でバタバタ"
+#検索するワード（なんかよくわかんないけどダメでした）
+#TRACKWORD = "田端でバタバタ"
 
 class TabataDaemon < DaemonSpawn::Base
 	@filter = nil
