@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 #!/usr/bin/env ruby
 #-*- coding: utf-8 -*-
 
@@ -9,28 +8,33 @@ require 'sqlite3'
 require 'yaml'
 include SQLite3
 
+#検索するワード
+TRACKWORD = "田端でバタバタ"
+
 class TabataDaemon < DaemonSpawn::Base
 	@filter = nil
 	@stream = nil
 	
 	def start(args)
-		#puts("\n\n")
-		#ToDo: あとでLFになおす
-		nglists = open("nguser.txt").read.split("\r\n")
-		p nglists
-		#return
+		puts("\n\n") #ログの区切り
 		
+		#設定ファイルロード
 		begin
 			settings = YAML::load(open("./tabata.conf"))
 		rescue
-			puts "[ERROR] config file load failed."
+			puts "[#{Time.now}]: [ERROR] config file load failed."
 		end
+		puts "[#{Time.now}]: config file loaded."
+		
+		#NGユーザーリストロード
+		nglists = open("nguser.txt").read.split("\n")
+		puts "[#{Time.now}]: NGuser loaded: #{nglists.length} users."
+		
+		#SQLiteの準備
 		db = Database.new("./tabata.db")
-		#update.execute(count, screen_name)
 		update = db.prepare('UPDATE users SET count=?,recent=? WHERE screen_name=?')
-		# insert.execute(screen_name, created_at)
 		insert = db.prepare('INSERT INTO users VALUES(?, 1, ?)')
-
+		puts "[#{Time.now}]: database inited."
 
 		TweetStream.configure do |config|
 			config.consumer_key			= settings["consumer_key"]
@@ -46,92 +50,117 @@ class TabataDaemon < DaemonSpawn::Base
 			config.oauth_token			= settings["oauth_token"]
 			config.oauth_token_secret	= settings["oauth_token_secret"]
 		end
+		
+		if Twitter.user(settings["screen_name"]).nil? then
+			puts "[#{Time.now}]: [ERROR] Twitter API Error"
+		end
 
 		client = TweetStream::Client.new
+		#usClient = TweetStream::Client.new
+		beforeTabaTime = Time.at(334334334) #適当
 
-		puts "Tabata_bot is ready!"
-      	begin
-			@filter = Thread.new{			
+		begin
+			@filter = Thread.new{
+				puts "[#{Time.now}]: filter thread started."
 				client.track("田端でバタバタ") do |status|
-					if status.retweeted_status.nil? & nglists.index(status.user.screen_name) == nil then #フィルタ
-						puts "new tweet catched"
+					interval = (status.created_at - beforeTabaTime).to_i
+					
+					if status.retweeted_status.nil? && nglists.index(status.user.screen_name).nil? then #フィルタ
+						
 						Twitter.favorite(status.id)
 					
 						i = db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name='#{status.user.screen_name}'")
 						if i != 0 then
-							puts "update"
+							puts "[#{Time.now}]: db update"
 						
-						count =	db.get_first_value("SELECT count FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
+							count =	db.get_first_value("SELECT count FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
 							recent = db.get_first_value("SELECT recent FROM users WHERE screen_name = \"#{status.user.screen_name}\"")
-							#p (status.created_at-recent).to_time.to_i
 							count = count + 1
-						
-							begin
-								Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に田端でバタバタしました。通算#{count}回目です。")
-								rescue => exc
-									puts "[!] Twitter Error"
-								p exc
+							
+							if interval >= 85 then
+								beforeTabaTime = status.created_at
+								puts "[#{Time.now}]: twitter update"
+								begin
+									Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に田端でバタバタしました。通算#{count}回目です。")
+									rescue => exc
+										puts "[#{Time.now}]: [ERROR] Twitter Error"
+									p exc
+								end
+							else
+								puts "[#{Time.now}]: postlimit evasion."
 							end
 						
 							begin
 								update.execute(count, status.created_at.to_s, status.user.screen_name)
 							rescue => exc
-								puts "[!] SQL Error"
+								puts "[#{Time.now}]: [ERROR] SQL Error"
 								p exc
 							end
-							puts("updated: #{status.user.screen_name}")
+							puts "[#{Time.now}]: updated: #{status.user.screen_name}"
 						
 						else
-							puts "insert"
+							puts "[#{Time.now}]: insert"
 						
 							begin
 								Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に初めて田端でバタバタしました。")
 							rescue => exc
-								puts "[!] Twitter Error"
+								puts "[#{Time.now}]: [ERROR] Twitter Error"
 								p exc
 							end
 						
 							begin
 								insert.execute(status.user.screen_name, status.created_at.to_s)
 							rescue => exc
-								puts "[!] SQL Error"
+								puts "[#{Time.now}]: [ERROR] SQL Error"
 								p exc
 							end
 						
-							puts "new user: #{status.user.screen_name}"
+							puts "[#{Time.now}]: new user: #{status.user.screen_name}"
 						end
+					elsif nglists.index(status.user.screen_name) != nil then
+						puts "[#{Time.now}]: NGUser blocked: #{status.user.screen_name}"
+					else
+						puts "[#{Time.now}]: retweet blocked"
 					end
 
-					sleep 0.01
-            	end
-			}
-        rescue => exc
-			puts "[ERROR] UserStream Thread exception:#{exc}"
-          	retry
-        end
-
-      	begin
-			@stream = Thread.new{
-				client.userstream do |status|
-	          		puts "stream catched"
-					if status.user.screen_name == "misodengaku" and status.text.include?("生存確認") then
-						Twitter.favorite(status.id)
-						Twitter.update("@misodengaku 田端botは正常に稼働しています。")
-					end
 					sleep 0.01
 				end
 			}
-        rescue => exc
-			puts "[ERROR] UserStream Thread exception:#{exc}"
-          	retry
-        end
+		rescue => exc
+			puts "[#{Time.now}]: [ERROR] UserStream Thread exception:#{exc}"
+			retry
+		end
+
+		#begin
+		#	@stream = Thread.new{
+		#		puts "[#{Time.now}]: userstream thread started."
+		#		TweetStream::Client.new.userstream do |status|
+		#			puts "[#{Time.now}]: stream catched"
+		#			if status.user.screen_name == "misodengaku" and status.text.include?("生存確認") then
+		#				Twitter.favorite(status.id)
+		#				Twitter.update("@misodengaku 田端botは正常に稼働しています。")
+		#			end
+		#			sleep 0.01
+		#		end
+		#	}
+		#rescue => exc
+		#	puts "[#{Time.now}]: [ERROR] UserStream Thread exception:#{exc}"
+		#	retry
+		#end
 		
-		puts "thread start"
-		@stream.run
-		@filter.join
+		puts "[#{Time.now}]: Tabata_bot is ready!"
+		
+		#begin
+			#@stream.run
+			@filter.join
+		#rescue => exc
+		#	puts "[#{Time.now}]: [ERROR] thread start failed."
+		#	p exc
+		#end
 	end
 	
 	def stop
+		puts "[#{Time.now}]: Tabata_bot is stoped."
 		if @filter then
 			Thread::kill(@filter)
 		end
@@ -139,7 +168,6 @@ class TabataDaemon < DaemonSpawn::Base
 			Thread::kill(@stream)
 		end
 		
-		puts "Tabata_bot is stoped."
 	end
 end
 
@@ -150,138 +178,3 @@ TabataDaemon.spawn!({
 	:sync_log => true,
 	:singleton => true # これを指定すると多重起動しない
 })
-=======
-#!/usr/bin/env ruby
-#-*- coding: utf-8 -*-
-
-require 'daemon_spawn'
-require 'tweetstream'
-require 'time'
-require 'sqlite3'
-require 'yaml'
-include SQLite3
-
-class TabataDaemon < DaemonSpawn::Base
-	@filter = nil
-	@stream = nil
-	
-	def start(args)
-		puts("\n\n")
-		nglists = open("nglist.txt").split("\n")
-		p nglists
-		return
-		
-		
-		settings = YAML::load(open("./tabata.conf"))
-		db = Database.new("./tabata.db")
-		#update.execute(count, screen_name)
-		update = db.prepare('UPDATE users SET count=?,recent=? WHERE screen_name=?')
-		# insert.execute(screen_name, created_at)
-		insert = db.prepare('INSERT INTO users VALUES(?, 1, ?)')
-
-
-		TweetStream.configure do |config|
-			config.consumer_key			= settings["consumer_key"]
-			config.consumer_secret		= settings["consumer_secret"]
-			config.oauth_token			= settings["oauth_token"]
-			config.oauth_token_secret	= settings["oauth_token_secret"]
-			config.auth_method			= :oauth
-		end
-
-		Twitter.configure do |config|
-			config.consumer_key			= settings["consumer_key"]
-			config.consumer_secret		= settings["consumer_secret"]
-			config.oauth_token			= settings["oauth_token"]
-			config.oauth_token_secret	= settings["oauth_token_secret"]
-		end
-
-		client = TweetStream::Client.new
-
-		puts "Tabata_bot is ready!"
-		@filter = Thread.new{
-			
-			client.track("田端でバタバタ") do |status|
-				if status.retweeted_status.nil? then #RT弾き
-					puts "new tweet catched"
-					Twitter.favorite(status.id)
-					
-					i = db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name='#{status.user.screen_name}'")
-					if i != 0 then
-						puts "update"
-					
-						count =	db.get_first_value("SELECT count FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
-						recent = db.get_first_value("SELECT recent FROM users WHERE screen_name = \"#{status.user.screen_name}\"")
-						#p (status.created_at-recent).to_time.to_i
-						count = count + 1
-						
-						begin
-							Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に田端でバタバタしました。通算#{count}回目です。")
-						rescue => exc
-							puts "[!] Twitter Error"
-							p exc
-						end
-						
-						begin
-							update.execute(count, status.created_at.to_s, status.user.screen_name)
-						rescue => exc
-							puts "[!] SQL Error"
-							p exc
-						end
-						puts("updated: #{status.user.screen_name}")
-						
-					else
-						puts "insert"
-						
-						begin
-							Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に初めて田端でバタバタしました。")
-						rescue => exc
-							puts "[!] Twitter Error"
-							p exc
-						end
-						
-						begin
-							insert.execute(status.user.screen_name, status.created_at.to_s)
-						rescue => exc
-							puts "[!] SQL Error"
-							p exc
-						end
-						
-						puts "new user: #{status.user.screen_name}"
-					end
-				end
-
-				sleep 0.01
-			end
-		}
-		
-		@stream = Thread.new{
-			client.userstream do |status|
-				if status.user.screen_name == "misodengaku" and status.text.include?("生存確認") then
-					Twitter.favorite(status.id)
-					Twitter.update("@misodengaku 田端botは正常に稼働しています。")
-				end
-				sleep 0.01
-			end
-		}
-		
-		puts "thread start"
-		@stream.run
-		@filter.join
-	end
-	
-	def stop
-		Thread::kill(@filter)
-		Thread::kill(@stream)
-		
-		puts "Tabata_bot is stoped."
-	end
-end
-
-TabataDaemon.spawn!({
-	:working_dir => Dir::getwd, # これだけ必須オプション
-	:pid_file => './tabata.pid',
-	:log_file => './tabata.log',
-	:sync_log => true,
-	:singleton => true # これを指定すると多重起動しない
-})
->>>>>>> origin/master
