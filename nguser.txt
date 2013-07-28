@@ -28,3 +28,6 @@ riosu_another
 uu_s6
 riosukun
 misodengaku_14
+ruitasu_a
+ruitasu_b
+

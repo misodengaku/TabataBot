@@ -56,7 +56,7 @@ class TabataDaemon < DaemonSpawn::Base
 		end
 
 		client = TweetStream::Client.new
-		#usClient = TweetStream::Client.new
+		usClient = TweetStream::Client.new
 		beforeTabaTime = Time.at(334334334) #適当
 
 		begin
@@ -127,7 +127,6 @@ class TabataDaemon < DaemonSpawn::Base
 					else
 						puts "[#{Time.now}]: retweet blocked"
 					end
-
 					sleep 0.01
 				end
 			}
@@ -139,12 +138,12 @@ class TabataDaemon < DaemonSpawn::Base
 		#begin
 		#	@stream = Thread.new{
 		#		puts "[#{Time.now}]: userstream thread started."
-		#		TweetStream::Client.new.userstream do |status|
+		#		usClient.userstream do |status|
 		#			puts "[#{Time.now}]: stream catched"
-		#			if status.user.screen_name == "misodengaku" and status.text.include?("生存確認") then
-		#				Twitter.favorite(status.id)
-		#				Twitter.update("@misodengaku 田端botは正常に稼働しています。")
-		#			end
+		#			#if status.user.screen_name == "misodengaku" and status.text.include?("生存確認") then
+		#			#	Twitter.favorite(status.id)
+		#			#	Twitter.update("@misodengaku 田端botは正常に稼働しています。")
+		#			#end
 		#			sleep 0.01
 		#		end
 		#	}
@@ -152,12 +151,14 @@ class TabataDaemon < DaemonSpawn::Base
 		#	puts "[#{Time.now}]: [ERROR] UserStream Thread exception:#{exc}"
 		#	retry
 		#end
-		
+		#
 		puts "[#{Time.now}]: Tabata_bot is ready!"
 		
 		#begin
-			#@stream.run
-			@filter.join
+		
+		#@stream.run
+		@filter.join
+		
 		#rescue => exc
 		#	puts "[#{Time.now}]: [ERROR] thread start failed."
 		#	p exc
