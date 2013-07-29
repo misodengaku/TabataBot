@@ -65,7 +65,7 @@ class TabataDaemon < DaemonSpawn::Base
 				client.track("田端でバタバタ") do |status|
 					interval = (status.created_at - beforeTabaTime).to_i
 					puts "interval #{interval}"
-					if status.retweeted_status.nil? && nglists.index(status.user.screen_name).nil? then #フィルタ
+					if status.retweeted_status.nil? && nglists.index(status.user.screen_name).nil? then # && status.source.index("twittbot.net").nil? then #フィルタ
 						
 						Twitter.favorite(status.id)
 					
