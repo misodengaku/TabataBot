@@ -64,12 +64,18 @@ class TabataDaemon < DaemonSpawn::Base
 				puts "[#{Time.now}]: filter thread started."
 				client.track("田端でバタバタ") do |status|
 					interval = (status.created_at - beforeTabaTime).to_i
-					puts "interval #{interval}"
+					puts "[#{Time.now}]: new tweet interval #{interval}"
 					if status.retweeted_status.nil? && nglists.index(status.user.screen_name).nil? then # && status.source.index("twittbot.net").nil? then #フィルタ
-						
-						Twitter.favorite(status.id)
+						puts "[#{Time.now}]: accepted"
+						begin
+							Twitter.favorite(status.id)
+						rescue => exc
+							puts"[#{Time.now}]: [ERROR] Twitter Error (Fav Limit?)"
+							p exc
+						end
 					
 						i = db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name='#{status.user.screen_name}'")
+						
 						if i != 0 then
 							puts "[#{Time.now}]: db update"
 						
@@ -122,7 +128,7 @@ class TabataDaemon < DaemonSpawn::Base
 						
 							puts "[#{Time.now}]: new user: #{status.user.screen_name}"
 						end
-					elsif nglists.index(status.user.screen_name) != nil then
+					elsif !nglists.index(status.user.screen_name).nil? then
 						puts "[#{Time.now}]: NGUser blocked: #{status.user.screen_name}"
 					else
 						puts "[#{Time.now}]: retweet blocked"
