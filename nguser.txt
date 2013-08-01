@@ -26,6 +26,7 @@ nr4i
 riosu_another
 7ptb
 uu_s6
+uu_s62
 riosukun
 misodengaku_14
 ruitasu_a

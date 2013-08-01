@@ -34,6 +34,11 @@ class TabataDaemon < DaemonSpawn::Base
 		db = Database.new("./tabata.db")
 		update = db.prepare('UPDATE users SET count=?,recent=? WHERE screen_name=?')
 		insert = db.prepare('INSERT INTO users VALUES(?, 1, ?)')
+		delete = db.prepare('DELETE FROM users WHERE screen_name=?')
+		nglists.each do |name|
+			delete.execute(name)
+		end
+		puts "[#{Time.now}]: nguser remove complete."
 		puts "[#{Time.now}]: database inited."
 
 		TweetStream.configure do |config|
