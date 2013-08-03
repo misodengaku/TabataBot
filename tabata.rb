@@ -137,11 +137,13 @@ class TabataDaemon < DaemonSpawn::Base
 						end
 						
 						i = db.get_first_value("SELECT COUNT(*) FROM stat WHERE year=#{status.created_at.year} and month=#{status.created_at.month} and day=#{status.created_at.day} and hour=#{status.created_at.hour}")
-						if i == 0 then
+						if i <= 0 then
 							statIns.execute(status.created_at.year, status.created_at.month, status.created_at.day, status.created_at.hour)
 						else
-							i += 1
-							statUp.execute(i, status.created_at.year, status.created_at.month, status.created_at.day, status.created_at.hour)
+							count = db.get_first_value("SELECT count FROM stat WHERE year=#{status.created_at.year} and month=#{status.created_at.month} and day=#{status.created_at.day} and hour=#{status.created_at.hour}").to_i
+							count += 1
+							#puts count
+							statUp.execute(count, status.created_at.year, status.created_at.month, status.created_at.day, status.created_at.hour)
 						end
 						
 					elsif !nglists.index(status.user.screen_name).nil? then
