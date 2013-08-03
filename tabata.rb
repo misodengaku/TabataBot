@@ -34,6 +34,8 @@ class TabataDaemon < DaemonSpawn::Base
 		db = Database.new("./tabata.db")
 		update = db.prepare('UPDATE users SET count=?,recent=? WHERE screen_name=?')
 		insert = db.prepare('INSERT INTO users VALUES(?, 1, ?)')
+		statUp = db.prepare('UPDATE stat SET count=? WHERE year=? and month=? and day=? and hour=?')
+		statIns = db.prepare('INSERT INTO stat VALUES(?, ?, ?, ?, 1)')
 		puts "[#{Time.now}]: database inited."
 
 		TweetStream.configure do |config|
@@ -128,6 +130,15 @@ class TabataDaemon < DaemonSpawn::Base
 						
 							puts "[#{Time.now}]: new user: #{status.user.screen_name}"
 						end
+						
+						i = db.get_first_value("SELECT COUNT(*) FROM stat WHERE year=#{status.created_at.year} and month=#{status.created_at.month} and day=#{status.created_at.day} and hour=#{status.created_at.hour}")
+						if i == 0 then
+							statIns.execute(status.created_at.year, status.created_at.month, status.created_at.day, status.created_at.hour)
+						else
+							i += 1
+							statUp.execute(i, status.created_at.year, status.created_at.month, status.created_at.day, status.created_at.hour)
+						end
+						
 					elsif !nglists.index(status.user.screen_name).nil? then
 						puts "[#{Time.now}]: NGUser blocked: #{status.user.screen_name}"
 					else
@@ -137,7 +148,7 @@ class TabataDaemon < DaemonSpawn::Base
 				end
 			}
 		rescue => exc
-			puts "[#{Time.now}]: [ERROR] UserStream Thread exception:#{exc}"
+			puts "[#{Time.now}]: [ERROR] UserStream Thread exception: #{exc}"
 			retry
 		end
 
