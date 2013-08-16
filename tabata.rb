@@ -75,10 +75,8 @@ class TabataDaemon < DaemonSpawn::Base
 					puts "[#{Time.now}]: new tweet interval #{interval}"
 					if status.retweeted_status.nil? && nglists.index(status.user.screen_name).nil? then # && status.source.index("twittbot.net").nil? then #フィルタ
 						puts "[#{Time.now}]: accepted #{status.user.screen_name}"
-						recent = db.get_first_value("SELECT recent FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
-						
-						if recent != 0 then
-							recent = Time.parse(recent)
+						if db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i != 0 then
+							recent = Time.parse(db.get_first_value("SELECT recent FROM users WHERE screen_name = \"#{status.user.screen_name}\""))
 							recent = (status.created_at - recent).to_i
 						else
 							recent = 60
