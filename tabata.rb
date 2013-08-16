@@ -41,6 +41,7 @@ class TabataDaemon < DaemonSpawn::Base
 		puts "[#{Time.now}]: nguser remove complete."
 		statUp = db.prepare('UPDATE stat SET count=? WHERE year=? and month=? and day=? and hour=?')
 		statIns = db.prepare('INSERT INTO stat VALUES(?, ?, ?, ?, 1)')
+		lastUp = db.prepare('UPDATE last SET screen_name=?')
 		puts "[#{Time.now}]: database inited."
 
 		TweetStream.configure do |config|
@@ -73,79 +74,90 @@ class TabataDaemon < DaemonSpawn::Base
 					interval = (status.created_at - beforeTabaTime).to_i
 					puts "[#{Time.now}]: new tweet interval #{interval}"
 					if status.retweeted_status.nil? && nglists.index(status.user.screen_name).nil? then # && status.source.index("twittbot.net").nil? then #フィルタ
-						puts "[#{Time.now}]: accepted"
-						begin
-							Twitter.favorite(status.id)
-						rescue => exc
-							puts"[#{Time.now}]: [ERROR] Twitter Error (Fav Limit?)"
-							p exc
+						puts "[#{Time.now}]: accepted #{status.user.screen_name}"
+						recent = db.get_first_value("SELECT recent FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
+						
+						if recent != 0 then
+							recent = Time.parse(recent)
+							recent = (status.created_at - recent).to_i
+						else
+							recent = 60
 						end
-					
-						i = db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name='#{status.user.screen_name}'")
+						if recent > 59 then
+							begin
+								Twitter.favorite(status.id)
+							rescue => exc
+								puts"[#{Time.now}]: [ERROR] Twitter Error (Fav Limit?)"
+								p exc
+							end
 						
-						if i != 0 then
-							puts "[#{Time.now}]: db update"
-						
-							count =	db.get_first_value("SELECT count FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
-							recent = db.get_first_value("SELECT recent FROM users WHERE screen_name = \"#{status.user.screen_name}\"")
-							count = count + 1
+							i = db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name='#{status.user.screen_name}'")
 							
-							if interval >= 85 then
-								beforeTabaTime = status.created_at
-								puts "[#{Time.now}]: twitter update"
+							if i != 0 then
+								puts "[#{Time.now}]: db update"
+							
+								count =	db.get_first_value("SELECT count FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
+								count = count + 1
+								lastuser = db.get_first_value("SELECT screen_name FROM last").to_s
+								if interval >= 85 + rand(10) and status.user.screen_name != lastuser then
+									beforeTabaTime = status.created_at
+									puts "[#{Time.now}]: twitter update"
+									begin
+										Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に田端でバタバタしました。通算#{count}回目です。")
+									rescue => exc
+											puts "[#{Time.now}]: [ERROR] Twitter Error"
+										p exc
+									end
+									lastUp.execute(status.user.screen_name)
+								else
+									puts "[#{Time.now}]: postlimit evasion."
+								end
+							
 								begin
-									Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に田端でバタバタしました。通算#{count}回目です。")
+									update.execute(count, status.created_at.to_s, status.user.screen_name)
+								rescue => exc
+									puts "[#{Time.now}]: [ERROR] SQL Error"
+									p exc
+								end
+								puts "[#{Time.now}]: updated: #{status.user.screen_name}"
+							
+							else
+								puts "[#{Time.now}]: insert"
+								
+								if interval >= 85 + rand(10) then
+									beforeTabaTime = status.created_at
+									begin
+										Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に初めて田端でバタバタしました。")
 									rescue => exc
 										puts "[#{Time.now}]: [ERROR] Twitter Error"
-									p exc
+										p exc
+									end
+								else
+									puts "[#{Time.now}]: postlimit evasion."
 								end
-							else
-								puts "[#{Time.now}]: postlimit evasion."
-							end
-						
-							begin
-								update.execute(count, status.created_at.to_s, status.user.screen_name)
-							rescue => exc
-								puts "[#{Time.now}]: [ERROR] SQL Error"
-								p exc
-							end
-							puts "[#{Time.now}]: updated: #{status.user.screen_name}"
-						
-						else
-							puts "[#{Time.now}]: insert"
 							
-							if interval >= 85 then
-								beforeTabaTime = status.created_at
 								begin
-									Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に初めて田端でバタバタしました。")
+									insert.execute(status.user.screen_name, status.created_at.to_s)
 								rescue => exc
-									puts "[#{Time.now}]: [ERROR] Twitter Error"
+									puts "[#{Time.now}]: [ERROR] SQL Error"
 									p exc
 								end
+							
+								puts "[#{Time.now}]: new user: #{status.user.screen_name}"
+							end
+							
+							i = db.get_first_value("SELECT COUNT(*) FROM stat WHERE year=#{status.created_at.year} and month=#{status.created_at.month} and day=#{status.created_at.day} and hour=#{status.created_at.hour}")
+							if i <= 0 then
+								statIns.execute(status.created_at.year, status.created_at.month, status.created_at.day, status.created_at.hour)
 							else
-								puts "[#{Time.now}]: postlimit evasion."
+								count = db.get_first_value("SELECT count FROM stat WHERE year=#{status.created_at.year} and month=#{status.created_at.month} and day=#{status.created_at.day} and hour=#{status.created_at.hour}").to_i
+								count += 1
+								#puts count
+								statUp.execute(count, status.created_at.year, status.created_at.month, status.created_at.day, status.created_at.hour)
 							end
-						
-							begin
-								insert.execute(status.user.screen_name, status.created_at.to_s)
-							rescue => exc
-								puts "[#{Time.now}]: [ERROR] SQL Error"
-								p exc
-							end
-						
-							puts "[#{Time.now}]: new user: #{status.user.screen_name}"
-						end
-						
-						i = db.get_first_value("SELECT COUNT(*) FROM stat WHERE year=#{status.created_at.year} and month=#{status.created_at.month} and day=#{status.created_at.day} and hour=#{status.created_at.hour}")
-						if i <= 0 then
-							statIns.execute(status.created_at.year, status.created_at.month, status.created_at.day, status.created_at.hour)
 						else
-							count = db.get_first_value("SELECT count FROM stat WHERE year=#{status.created_at.year} and month=#{status.created_at.month} and day=#{status.created_at.day} and hour=#{status.created_at.hour}").to_i
-							count += 1
-							#puts count
-							statUp.execute(count, status.created_at.year, status.created_at.month, status.created_at.day, status.created_at.hour)
+							puts "[#{Time.now}]: 1min limit: #{status.user.screen_name}"
 						end
-						
 					elsif !nglists.index(status.user.screen_name).nil? then
 						puts "[#{Time.now}]: NGUser blocked: #{status.user.screen_name}"
 					else
