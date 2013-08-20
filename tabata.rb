@@ -14,6 +14,7 @@ include SQLite3
 class TabataDaemon < DaemonSpawn::Base
 	@filter = nil
 	@stream = nil
+	@flFlag = false
 	
 	def start(args)
 		puts("\n\n") #ログの区切り
@@ -63,6 +64,8 @@ class TabataDaemon < DaemonSpawn::Base
 			puts "[#{Time.now}]: [ERROR] Twitter API Error"
 		end
 
+		Twitter.update_profile(:name => "田端でバタバタ")
+
 		client = TweetStream::Client.new
 		usClient = TweetStream::Client.new
 		beforeTabaTime = Time.at(334334334) #適当
@@ -84,9 +87,15 @@ class TabataDaemon < DaemonSpawn::Base
 						if recent > 59 then
 							begin
 								Twitter.favorite(status.id)
+								if @flFlag then
+									Twitter.update_profile(:name => "田端でバタバタ")
+									@flFlag = false
+								end
 							rescue => exc
 								puts"[#{Time.now}]: [ERROR] Twitter Error (Fav Limit?)"
-								p exc
+								Twitter.update_profile(:name => "田端でバタバタ (ふぁぼ規制中)")
+								@flFlag = true
+								# p exc
 							end
 						
 							i = db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name='#{status.user.screen_name}'")
@@ -102,9 +111,15 @@ class TabataDaemon < DaemonSpawn::Base
 									puts "[#{Time.now}]: twitter update"
 									begin
 										Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に田端でバタバタしました。通算#{count}回目です。")
+										if @flFlag then
+											Twitter.update_profile(:name => "田端でバタバタ")
+											@flFlag = false
+										end
 									rescue => exc
-											puts "[#{Time.now}]: [ERROR] Twitter Error"
-										p exc
+										puts "[#{Time.now}]: [ERROR] Twitter Error"
+										Twitter.update_profile(:name => "田端でバタバタ (ふぁぼ規制中)")
+										@flFlag = true
+										# p exc
 									end
 									lastUp.execute(status.user.screen_name)
 								else
