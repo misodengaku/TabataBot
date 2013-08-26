@@ -78,13 +78,15 @@ class TabataDaemon < DaemonSpawn::Base
 					puts "[#{Time.now}]: new tweet interval #{interval}"
 					if status.retweeted_status.nil? && nglists.index(status.user.screen_name).nil? then # && status.source.index("twittbot.net").nil? then #フィルタ
 						puts "[#{Time.now}]: accepted #{status.user.screen_name}"
+						count = 0
 						if db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i != 0 then
 							recent = Time.parse(db.get_first_value("SELECT recent FROM users WHERE screen_name = \"#{status.user.screen_name}\""))
 							recent = (status.created_at - recent).to_i
+							count = db.get_first_value("SELECT count FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
 						else
 							recent = 60
 						end
-						if recent > 59 then
+						if recent > 59 + count then
 							begin
 								Twitter.favorite(status.id)
 								if @flFlag then
@@ -93,8 +95,10 @@ class TabataDaemon < DaemonSpawn::Base
 								end
 							rescue => exc
 								puts"[#{Time.now}]: [ERROR] Twitter Error (Fav Limit?)"
-								Twitter.update_profile(:name => "田端でバタバタ (ふぁぼ規制中)")
-								@flFlag = true
+								if !@flFlag then
+									Twitter.update_profile(:name => "田端でバタバタ (ふぁぼ規制中)")
+									@flFlag = true
+								end
 								# p exc
 							end
 						
@@ -103,7 +107,7 @@ class TabataDaemon < DaemonSpawn::Base
 							if i != 0 then
 								puts "[#{Time.now}]: db update"
 							
-								count =	db.get_first_value("SELECT count FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
+								# count =	db.get_first_value("SELECT count FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
 								count = count + 1
 								lastuser = db.get_first_value("SELECT screen_name FROM last").to_s
 								if interval >= 85 + rand(10) and status.user.screen_name != lastuser then
@@ -117,8 +121,10 @@ class TabataDaemon < DaemonSpawn::Base
 										end
 									rescue => exc
 										puts "[#{Time.now}]: [ERROR] Twitter Error"
-										Twitter.update_profile(:name => "田端でバタバタ (ふぁぼ規制中)")
-										@flFlag = true
+										if !@flFlag then
+											Twitter.update_profile(:name => "田端でバタバタ (ふぁぼ規制中)")
+											@flFlag = true
+										end
 										# p exc
 									end
 									lastUp.execute(status.user.screen_name)
