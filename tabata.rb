@@ -86,7 +86,7 @@ class TabataDaemon < DaemonSpawn::Base
 						else
 							recent = 60
 						end
-						if recent > 59 + count then
+						if recent > 119 + count then
 							begin
 								Twitter.favorite(status.id)
 								if @flFlag then
