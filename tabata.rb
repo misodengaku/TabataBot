@@ -76,7 +76,7 @@ class TabataDaemon < DaemonSpawn::Base
 				client.track("田端でバタバタ") do |status|
 					interval = (status.created_at - beforeTabaTime).to_i
 					puts "[#{Time.now}]: new tweet interval #{interval}"
-					if status.retweeted_status.nil? && nglists.index(status.user.screen_name).nil? then # && status.source.index("twittbot.net").nil? then #フィルタ
+					if status.retweeted_status.nil? && nglists.index(status.user.screen_name).nil? && status.source != "twittbot.net" then #フィルタ
 						puts "[#{Time.now}]: accepted #{status.user.screen_name}"
 						count = 0
 						if db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i != 0 then

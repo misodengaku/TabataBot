@@ -12,5 +12,6 @@ Twitter.configure do |config|
 end                                                                                
 nglists.each { |id|
 	Twitter.block(id)
+	puts "#{id} blocked."
 }
-puts "blocked."
+puts "complete."
