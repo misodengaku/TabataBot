@@ -31,6 +31,10 @@ class TabataDaemon < DaemonSpawn::Base
 		nglists = open("nguser.txt").read.split("\n")
 		puts "[#{Time.now}]: NGuser loaded: #{nglists.length} users."
 		
+		#NGクライアント
+		ngclient_lists = open("ngclient.txt").read.split("\n")
+		puts "[#{Time.now}]: NGclient loaded: #{ngclient_lists.length} clients."
+		
 		#SQLiteの準備
 		db = Database.new("./tabata.db")
 		update = db.prepare('UPDATE users SET count=?,recent=? WHERE screen_name=?')
@@ -74,17 +78,25 @@ class TabataDaemon < DaemonSpawn::Base
 			@filter = Thread.new{
 				puts "[#{Time.now}]: filter thread started."
 				client.track("田端でバタバタ") do |status|
+					ncFlag = false
+					ngclient_lists.each do |e|
+						if status.source.include?(e) then
+							ncFlag = true
+						end
+					end
+					
 					interval = (status.created_at - beforeTabaTime).to_i
-					puts "[#{Time.now}]: new tweet interval #{interval}"
-					if status.retweeted_status.nil? && nglists.index(status.user.screen_name).nil? && status.source != "twittbot.net" then #フィルタ
+					puts "[#{Time.now}]: new tweet interval #{interval} from #{status.source}"
+					if status.retweeted_status.nil? && nglists.index(status.user.screen_name).nil? && !ncFlag then #フィルタ
 						puts "[#{Time.now}]: accepted #{status.user.screen_name}"
 						count = 0
-						if db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i != 0 then
+						i = db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name='#{status.user.screen_name}'").to_i
+						if i != 0 then
 							recent = Time.parse(db.get_first_value("SELECT recent FROM users WHERE screen_name = \"#{status.user.screen_name}\""))
 							recent = (status.created_at - recent).to_i
 							count = db.get_first_value("SELECT count FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
 						else
-							recent = 60
+							recent = 120
 						end
 						if recent > 119 + count then
 							begin
@@ -141,7 +153,7 @@ class TabataDaemon < DaemonSpawn::Base
 								puts "[#{Time.now}]: updated: #{status.user.screen_name}"
 							
 							else
-								puts "[#{Time.now}]: insert"
+								puts "[#{Time.now}]: new user"
 								
 								if interval >= 85 + rand(10) then
 									beforeTabaTime = status.created_at
