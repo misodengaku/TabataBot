@@ -2,17 +2,18 @@
 =====
 
 田端でバタバタbot(<a href="https://twitter.com/Batabata_Tabata">@Batabata_Tabata</a>)のソースコードです。
+バタバタ回数の確認や遊び方等は<a href="http://totori.dip.jp/tabata/">こちら</a>から参照できます。
 
 ## 目次
 * [あそびかた](#howtoplay)
 * [動作環境](#environment)
-* [設定ファイル](#configure)
+* [動作に必要な設定](#configure)
 * [ライセンス](#license)
 * [改版履歴](#history)
 
 <a name="howtoplay">
 #あそびかた
-以前までの内容はすべて<a href="http://totori.dip.jp/tabata/">公式サイト</a>に移動しました。
+以前までの内容はすべて<a href="http://totori.dip.jp/tabata/about">公式サイト</a>に移動しました。
 
 <a name="environment"></a>
 #動作環境
@@ -20,17 +21,19 @@
 以下は開発環境です。
 
 * Gentoo Linux
-* Ruby 1.9.3
+* Ruby 2.0.0(元は1.9.3)
 * SQLite3
 * あとはrequireしてるライブラリをgemで適当に
 
 抜けている物があったら適宜インストールしてください。
 
 <a name="configure"></a>
-#設定ファイル
+#動作に必要な設定
+
+動作させるには設定ファイルの記述とDBに必要なテーブルを作成することが必要です。
+DBの設定はそのうちサンプルを作ろうと思っていますが面倒なのでソースを読むかDB関連の処理を思いっきり省いて動かしてください。
 
 以下の形式に従ってtabata.confファイルに書き込んでください。
-
 
 	screen_name: スクリーンネーム(@以降)
 	consumer_key: コンシューマーキー
