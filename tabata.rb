@@ -16,6 +16,10 @@ class TabataDaemon < DaemonSpawn::Base
 	@stream = nil
 	@flFlag = false
 	
+	def wait_count(count)
+	    return 43200 * (count / 100 / 10.0)
+	end
+	
 	def start(args)
 		puts("\n\n") #ログの区切り
 		
@@ -45,7 +49,7 @@ class TabataDaemon < DaemonSpawn::Base
 		end
 		puts "[#{Time.now}]: nguser remove complete."
 		statUp = db.prepare('UPDATE stat SET count=? WHERE year=? and month=? and day=? and hour=?')
-		statIns = db.prepare('INSERT INTO stat VALUES(?, ?, ?, ?, 1)')
+		statIns = db.prepare('INSERT INTO stat(year, month, day, hour, count) VALUES(?, ?, ?, ?, 1)')
 		lastUp = db.prepare('UPDATE last SET screen_name=?')
 		puts "[#{Time.now}]: database inited."
 
@@ -74,133 +78,143 @@ class TabataDaemon < DaemonSpawn::Base
 		usClient = TweetStream::Client.new
 		beforeTabaTime = Time.at(334334334) #適当
 
-		begin
-			@filter = Thread.new{
+		@filter = Thread.new{
+			loop do
 				puts "[#{Time.now}]: filter thread started."
-				client.track("田端でバタバタ") do |status|
-					ncFlag = false
-					ngclient_lists.each do |e|
-						if status.source.include?(e) then
-							ncFlag = true
-						end
-					end
-					
-					interval = (status.created_at - beforeTabaTime).to_i
-					puts "[#{Time.now}]: new tweet interval #{interval} from #{status.source}"
-					if status.retweeted_status.nil? && nglists.index(status.user.screen_name).nil? && !ncFlag then #フィルタ
-						puts "[#{Time.now}]: accepted #{status.user.screen_name}"
-						count = 0
-						i = db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name='#{status.user.screen_name}'").to_i
-						if i != 0 then
-							recent = Time.parse(db.get_first_value("SELECT recent FROM users WHERE screen_name = \"#{status.user.screen_name}\""))
-							recent = (status.created_at - recent).to_i
-							count = db.get_first_value("SELECT count FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
-						else
-							recent = 120
-						end
-						if recent > 119 + count then
-							begin
-								Twitter.favorite(status.id)
-								if @flFlag then
-									Twitter.update_profile(:name => "田端でバタバタ")
-									@flFlag = false
-								end
-							rescue => exc
-								puts"[#{Time.now}]: [ERROR] Twitter Error (Fav Limit?)"
-								if !@flFlag then
-									Twitter.update_profile(:name => "田端でバタバタ (ふぁぼ規制中)")
-									@flFlag = true
-								end
-								# p exc
+				begin
+					client.track("田端でバタバタ") do |status|
+						ncFlag = false
+						ngclient_lists.each do |e|
+							if status.source.include?(e) then
+								ncFlag = true
 							end
+						end
 						
-							i = db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name='#{status.user.screen_name}'")
-							
+						nglists.each do |e|
+							if status.text.include?(e) then
+								ncFlag = true
+							end
+						end
+						
+						interval = (status.created_at - beforeTabaTime).to_i
+						puts "[#{Time.now}]: new tweet interval #{interval} from #{status.source}"
+						if status.retweeted_status.nil? && nglists.index(status.user.screen_name).nil? && !ncFlag then #フィルタ
+							puts "[#{Time.now}]: accepted #{status.user.screen_name}"
+							count = 0
+							i = db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name='#{status.user.screen_name}'").to_i
 							if i != 0 then
-								puts "[#{Time.now}]: db update"
-							
-								# count =	db.get_first_value("SELECT count FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
-								count = count + 1
-								lastuser = db.get_first_value("SELECT screen_name FROM last").to_s
-								if interval >= 85 + rand(10) and status.user.screen_name != lastuser then
-									beforeTabaTime = status.created_at
-									puts "[#{Time.now}]: twitter update"
-									begin
-										Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に田端でバタバタしました。通算#{count}回目です。")
-										if @flFlag then
-											Twitter.update_profile(:name => "田端でバタバタ")
-											@flFlag = false
-										end
-									rescue => exc
-										puts "[#{Time.now}]: [ERROR] Twitter Error"
-										if !@flFlag then
-											Twitter.update_profile(:name => "田端でバタバタ (ふぁぼ規制中)")
-											@flFlag = true
-										end
-										# p exc
-									end
-									lastUp.execute(status.user.screen_name)
-								else
-									puts "[#{Time.now}]: postlimit evasion."
-								end
-							
-								begin
-									update.execute(count, status.created_at.to_s, status.user.screen_name)
-								rescue => exc
-									puts "[#{Time.now}]: [ERROR] SQL Error"
-									p exc
-								end
-								puts "[#{Time.now}]: updated: #{status.user.screen_name}"
-							
+								recent = Time.parse(db.get_first_value("SELECT recent FROM users WHERE screen_name = \"#{status.user.screen_name}\""))
+								recent = (status.created_at - recent).to_i
+								count = db.get_first_value("SELECT count FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
 							else
-								puts "[#{Time.now}]: new user"
+								recent = 120
+							end
+							if recent > 119 + count then
+								begin
+									Twitter.favorite(status.id)
+									if @flFlag then
+										Twitter.update_profile(:name => "田端でバタバタ")
+										@flFlag = false
+									end
+								rescue => exc
+									puts"[#{Time.now}]: [ERROR] Twitter Error (Fav Limit?)"
+									if !@flFlag then
+										Twitter.update_profile(:name => "田端でバタバタ (ふぁぼ規制中)")
+										@flFlag = true
+									end
+									# p exc
+								end
+							
+								i = db.get_first_value("SELECT COUNT(*) FROM users WHERE screen_name='#{status.user.screen_name}'")
 								
-								if interval >= 85 + rand(10) then
-									beforeTabaTime = status.created_at
+								if i != 0 then
+									puts "[#{Time.now}]: db update"
+								
+									# count =	db.get_first_value("SELECT count FROM users WHERE screen_name = \"#{status.user.screen_name}\"").to_i
+									count = count + 1
+									lastuser = db.get_first_value("SELECT screen_name FROM last").to_s
+									puts (85 + rand(10) + wait_count(count.to_i))
+									if interval >= (85 + rand(10)) and status.user.screen_name != lastuser then
+										beforeTabaTime = status.created_at
+										puts "[#{Time.now}]: twitter update"
+										begin
+											Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に田端でバタバタしました。通算#{count}回目です。")
+											if @flFlag then
+												Twitter.update_profile(:name => "田端でバタバタ")
+												@flFlag = false
+											end
+										rescue => exc
+											puts "[#{Time.now}]: [ERROR] Twitter Error"
+											if !@flFlag then
+												Twitter.update_profile(:name => "田端でバタバタ (ふぁぼ規制中)")
+												@flFlag = true
+											end
+											# p exc
+										end
+										lastUp.execute(status.user.screen_name)
+									else
+										puts "[#{Time.now}]: postlimit evasion."
+									end # of interval check
+								
 									begin
-										Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に初めて田端でバタバタしました。")
+										update.execute(count, status.created_at.to_s, status.user.screen_name)
 									rescue => exc
-										puts "[#{Time.now}]: [ERROR] Twitter Error"
+										puts "[#{Time.now}]: [ERROR] SQL Error"
 										p exc
 									end
+									puts "[#{Time.now}]: updated: #{status.user.screen_name}"
+								
 								else
-									puts "[#{Time.now}]: postlimit evasion."
+									puts "[#{Time.now}]: new user"
+									
+									if interval >= 85 + rand(10) then
+										beforeTabaTime = status.created_at
+										begin
+											Twitter.update("#{status.user.screen_name}さんが#{status.created_at.strftime("%H:%M:%S")}に初めて田端でバタバタしました。")
+										rescue => exc
+											puts "[#{Time.now}]: [ERROR] Twitter Error"
+											p exc
+										end
+									else
+										puts "[#{Time.now}]: postlimit evasion."
+									end
+								
+									begin
+										insert.execute(status.user.screen_name, status.created_at.to_s)
+									rescue => exc
+										puts "[#{Time.now}]: [ERROR] SQL Error"
+										p exc
+									end
+								
+									puts "[#{Time.now}]: new user: #{status.user.screen_name}"
 								end
-							
-								begin
-									insert.execute(status.user.screen_name, status.created_at.to_s)
-								rescue => exc
-									puts "[#{Time.now}]: [ERROR] SQL Error"
-									p exc
+								
+								i = db.get_first_value("SELECT COUNT(*) FROM stat WHERE year=#{status.created_at.year} and month=#{status.created_at.month} and day=#{status.created_at.day} and hour=#{status.created_at.hour}")
+								if i <= 0 then
+									statIns.execute(status.created_at.year, status.created_at.month, status.created_at.day, status.created_at.hour)
+								else
+									count = db.get_first_value("SELECT count FROM stat WHERE year=#{status.created_at.year} and month=#{status.created_at.month} and day=#{status.created_at.day} and hour=#{status.created_at.hour}").to_i
+									count += 1
+									#puts count
+									statUp.execute(count, status.created_at.year, status.created_at.month, status.created_at.day, status.created_at.hour)
 								end
-							
-								puts "[#{Time.now}]: new user: #{status.user.screen_name}"
-							end
-							
-							i = db.get_first_value("SELECT COUNT(*) FROM stat WHERE year=#{status.created_at.year} and month=#{status.created_at.month} and day=#{status.created_at.day} and hour=#{status.created_at.hour}")
-							if i <= 0 then
-								statIns.execute(status.created_at.year, status.created_at.month, status.created_at.day, status.created_at.hour)
 							else
-								count = db.get_first_value("SELECT count FROM stat WHERE year=#{status.created_at.year} and month=#{status.created_at.month} and day=#{status.created_at.day} and hour=#{status.created_at.hour}").to_i
-								count += 1
-								#puts count
-								statUp.execute(count, status.created_at.year, status.created_at.month, status.created_at.day, status.created_at.hour)
+								puts "[#{Time.now}]: 1min limit: #{status.user.screen_name}"
 							end
+						elsif !nglists.index(status.user.screen_name).nil? then
+							puts "[#{Time.now}]: NGUser blocked: #{status.user.screen_name}"
 						else
-							puts "[#{Time.now}]: 1min limit: #{status.user.screen_name}"
+							puts "[#{Time.now}]: retweet blocked"
 						end
-					elsif !nglists.index(status.user.screen_name).nil? then
-						puts "[#{Time.now}]: NGUser blocked: #{status.user.screen_name}"
-					else
-						puts "[#{Time.now}]: retweet blocked"
+						sleep 0.01
 					end
-					sleep 0.01
-				end
-			}
-		rescue => exc
-			puts "[#{Time.now}]: [ERROR] UserStream Thread exception: #{exc}"
-			retry
-		end
+				rescue => exc
+					puts "[#{Time.now}]: [ERROR] UserStream Thread exception: #{exc}"
+					retry
+				end # of begin
+				puts "[#{Time.now}]: stream disconnected."
+			end # of loop
+		}
 
 		#begin
 		#	@stream = Thread.new{
